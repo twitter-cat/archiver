@@ -6,7 +6,7 @@
   we are not affiliated with twitter or responsable for any content in the
   archives created with this tool. we can not moderate or remove content from
   these archives, please use them responsibly and respect people's privacy.
-  
+
   https://github.com/twitter-cat/twitterarchiver
   -->
   <head>
@@ -16,28 +16,37 @@
     <style>
       @font-face {
         font-family: "Chirp";
-        src: url("https://twitter.cat/assets/fonts/chirp.woff2");
+        src: url("./fonts/chirp.woff2"),
+          url("https://twitter.cat/assets/fonts/chirp.woff2");
         font-weight: 400;
+        font-display: swap;
       }
       @font-face {
         font-family: "Chirp";
-        src: url("https://twitter.cat/assets/fonts/chirpbold.woff2");
+        src: url("./fonts/chirpbold.woff2"),
+          url("https://twitter.cat/assets/fonts/chirpbold.woff2");
         font-weight: 700;
+        font-display: swap;
       }
       @font-face {
         font-family: "Chirp";
-        src: url("https://twitter.cat/assets/fonts/chirpheavy.woff2");
+        src: url("./fonts/chirpheavy.woff2"),
+          url("https://twitter.cat/assets/fonts/chirpheavy.woff2");
         font-weight: 900;
+        font-display: swap;
       }
 
       :root {
         --white: #e7e9ea;
         --blue: #1d9bf0;
         --grey: #71767b;
+        --border: #2f3336;
+        --sans: "Chirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
       }
 
       body {
-        font-family: "Chirp";
+        font-family: var(--sans);
         display: flex;
         justify-content: center;
         min-height: 100vh;
@@ -63,6 +72,46 @@
       .header {
         margin-bottom: 32px;
         user-select: none;
+      }
+
+      .profile {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin: 18px 0 10px;
+      }
+
+      .profile-avatar {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        background: var(--border);
+        object-fit: cover;
+        border: 1px solid var(--border);
+      }
+
+      .profile-meta .pname {
+        font-size: 20px;
+        font-weight: 800;
+        line-height: 1.2;
+      }
+
+      .profile-meta .phandle {
+        color: var(--grey);
+        font-size: 15px;
+      }
+
+      .profile-meta .pcounts {
+        color: var(--grey);
+        font-size: 13px;
+        margin-top: 4px;
+        display: flex;
+        gap: 14px;
+      }
+
+      .profile-meta .pcounts b {
+        color: var(--white);
       }
 
       .title {
@@ -104,7 +153,7 @@
         height: 44px;
         padding: 0 16px 0 48px;
         border-radius: 999px;
-        border: 1px solid #2f3336;
+        border: 1px solid var(--border);
         background: transparent;
         color: var(--white);
         font-family: inherit;
@@ -123,7 +172,7 @@
       }
 
       .tweet {
-        display: flex;
+        display: block;
         position: relative;
         padding: 12px;
         border-bottom: 1px solid transparent;
@@ -136,12 +185,18 @@
         border-image-slice: 1;
       }
 
+      .tweet-row {
+        display: flex;
+      }
+
       .avatar {
         width: 40px;
         height: 40px;
         border-radius: 50%;
         margin-right: 12px;
         flex-shrink: 0;
+        background: var(--border);
+        object-fit: cover;
       }
 
       .content {
@@ -149,13 +204,30 @@
         min-width: 0;
       }
 
-      .tweet-header {
+      .author {
         display: flex;
-        align-items: center;
-        margin-bottom: 6px;
+        align-items: baseline;
+        flex-wrap: wrap;
         gap: 4px;
+        margin-bottom: 2px;
         font-size: 15px;
+      }
+
+      .author .name {
+        font-weight: 700;
         color: var(--white);
+      }
+
+      .author .name:hover {
+        text-decoration: underline;
+      }
+
+      .author .handle {
+        color: var(--grey);
+      }
+
+      .author .sep {
+        color: var(--grey);
       }
 
       .date {
@@ -195,15 +267,91 @@
         margin-top: 12px;
         overflow: hidden;
         margin-bottom: 12px;
+        display: grid;
+        gap: 2px;
+        grid-template-columns: 1fr 1fr;
+        max-width: 425px;
+        border-radius: 16px;
+        border: 1px solid #71767b59;
+      }
+
+      .tweet-media.count-1 {
+        grid-template-columns: 1fr;
+      }
+
+      .tweet-media.count-3 .m:first-child {
+        grid-row: span 2;
+      }
+
+      .tweet-media .m {
+        position: relative;
+        margin: 0;
+        min-height: 0;
+        overflow: hidden;
+        background: #000;
+      }
+
+      .tweet-media.count-1 .m {
+        max-height: 510px;
+      }
+
+      .tweet-media:not(.count-1) .m {
+        aspect-ratio: 16 / 10;
       }
 
       .tweet-media img,
       .tweet-media video {
         width: 100%;
+        height: 100%;
         display: block;
-        max-width: 400px;
-        border: 1px solid #71767b59;
-        border-radius: 6px;
+        object-fit: cover;
+        background: #000;
+      }
+
+      .tweet-media.count-1 img,
+      .tweet-media.count-1 video {
+        max-height: 510px;
+        object-fit: contain;
+      }
+
+      .quote {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 12px;
+        margin: 4px 0 12px;
+      }
+
+      .quote .author {
+        font-size: 14px;
+      }
+
+      .quote .avatar-sm {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        margin-right: 2px;
+        vertical-align: middle;
+        background: var(--border);
+        object-fit: cover;
+      }
+
+      .quote .text {
+        font-size: 14px;
+        margin-bottom: 8px;
+      }
+
+      .quote .tweet-media {
+        margin-top: 8px;
+        margin-bottom: 0;
+      }
+
+      .quote-unavailable {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 12px;
+        margin: 4px 0 12px;
+        color: var(--grey);
+        font-size: 14px;
       }
 
       .actions {
@@ -257,6 +405,116 @@
         display: flex;
         flex-direction: column;
         gap: 4px;
+        align-items: flex-end;
+      }
+
+      .info a {
+        color: #cacaca;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        text-decoration-color: gray;
+        text-decoration-style: dotted;
+      }
+
+      .info a:hover {
+        color: var(--blue);
+        text-decoration: none;
+      }
+
+      .tabs {
+        display: flex;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 4px;
+        position: sticky;
+        top: 0;
+        background: #14171a;
+        z-index: 5;
+      }
+
+      .tab {
+        flex: 1;
+        text-align: center;
+        padding: 14px 0;
+        color: var(--grey);
+        font-size: 15px;
+        font-weight: 600;
+        background: none;
+        border: none;
+        font-family: inherit;
+        cursor: pointer;
+        position: relative;
+      }
+
+      .tab:hover {
+        background: rgba(231, 233, 234, 0.05);
+      }
+
+      .tab.active {
+        color: var(--white);
+      }
+
+      .tab.active::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 56px;
+        height: 4px;
+        border-radius: 999px;
+        background: var(--blue);
+      }
+
+      .repost-banner {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--grey);
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 4px;
+        margin-left: 8px;
+      }
+
+      .repost-banner svg {
+        width: 15px;
+        height: 15px;
+      }
+
+      .community-note {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px;
+        margin: 4px 0 12px;
+        background: rgba(231, 233, 234, 0.03);
+      }
+
+      .community-note .cn-title {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 700;
+        font-size: 14px;
+        margin-bottom: 4px;
+      }
+
+      .community-note .cn-title svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .community-note .cn-body {
+        font-size: 14px;
+        line-height: 19px;
+        color: var(--white);
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+
+      .empty {
+        text-align: center;
+        padding: 48px 20px;
+        color: var(--grey);
       }
 
       .loading {
@@ -285,6 +543,7 @@
             style="width: 38px; margin-bottom: 12px"
           />
         </a>
+        <div class="profile" id="profile" style="display: none"></div>
         <div class="title">loading archive…</div>
         <div class="metadata" id="metadata"></div>
       </div>
@@ -302,6 +561,12 @@
         <input class="searchbar" placeholder="search" />
       </div>
 
+      <div class="tabs" id="tabs">
+        <button class="tab active" data-tab="tweets">tweets</button>
+        <button class="tab" data-tab="replies">replies</button>
+        <button class="tab" data-tab="media">media</button>
+      </div>
+
       <div id="tweets" aria-live="polite"></div>
     </div>
 
@@ -315,6 +580,34 @@
       let renderedCount = 0;
       let loading = false;
       let metadata = {};
+      let activeTab = "tweets";
+      let searchQuery = "";
+
+      const isReply = (t) => !!t.in_reply_to;
+      const isRepost = (t) => !!t.retweet;
+      const hasMedia = (t) =>
+        (t.media?.length ?? 0) > 0 || (t.retweet?.media?.length ?? 0) > 0;
+
+      function matchesTab(t) {
+        if (activeTab === "replies") return isReply(t);
+        if (activeTab === "media") return hasMedia(t);
+        return !isReply(t);
+      }
+
+      function matchesSearch(t) {
+        if (!searchQuery) return true;
+        const src = t.retweet || t;
+        const parts = [
+          src.full_text,
+          src.author?.name,
+          src.author?.screen_name,
+          t.community_note?.text,
+          t.quote?.full_text,
+          t.quote?.author?.name,
+          t.quote?.author?.screen_name,
+        ];
+        return parts.join(" ").toLowerCase().includes(searchQuery);
+      }
 
       init();
 
@@ -324,27 +617,14 @@
           metadata = await metaResponse.json();
           renderMetadata();
 
-          const csvText = await fetch("./tweets.csv").then((res) => res.text());
-          const rows = parseCSV(csvText.trim());
-          const headers = rows.shift().map((h) => h.trim());
-
-          tweets = rows
-            .filter(
-              (row) => row.length && row.some((cell) => cell.trim() !== ""),
-            )
-            .map((row) =>
-              headers.reduce((acc, key, idx) => {
-                acc[key] = row[idx] ?? "";
-                return acc;
-              }, {}),
-            );
-
-          filteredTweets = tweets.slice();
-          renderNextPage();
+          tweets = await fetch("./tweets.json").then((res) => res.json());
+          renderProfile();
+          setupTabs();
+          applyFilters();
           attachScrollListener();
           searchInput?.addEventListener("input", handleSearch);
         } catch (error) {
-          tweetsRoot.innerHTML = `<div class="error">failed to read tweets${location.protocol === "file:" ? ". due to browser security limits, loading the viewer over the file protocol won’t work. you’ll need to serve it over http, for example using cloudflare pages or any local web server." : ""}</div>`;
+          tweetsRoot.innerHTML = `<div class="error">failed to read tweets${location.protocol === "file:" ? ". due to browser security limits, loading the viewer over the file protocol won't work. you'll need to serve it over http, for example using cloudflare pages or any local web server." : ""}</div>`;
           console.error(error);
         }
       }
@@ -354,58 +634,77 @@
         document.querySelector(".title").textContent =
           `tweets by @${metadata.username}`;
         document.querySelector(".searchbar").placeholder =
-          `search ${metadata.tweet_count.toLocaleString()} tweets, ${metadata.media_count.toLocaleString()} images`;
+          `search ${(metadata.tweet_count ?? 0).toLocaleString()} tweets, ${(metadata.media_count ?? 0).toLocaleString()} media`;
         metadataRoot.innerHTML = `<div class="metadata-item">archived ${exported} by <a href="https://github.com/twitter-cat/twitterarchiver" target="_blank">TwitterArchiver</a></div>do not use archives to doxx anyone.`;
       }
 
-      function parseCSV(text) {
-        const rows = [];
-        let current = "";
-        let inQuotes = false;
-        let row = [];
+      function renderProfile() {
+        const target = (metadata.username || "").toLowerCase();
+        let author =
+          tweets.find(
+            (t) => (t.author?.screen_name || "").toLowerCase() === target,
+          )?.author || tweets[0]?.author;
+        if (!author) return;
 
-        for (let i = 0; i < text.length; i++) {
-          const char = text[i];
-          const next = text[i + 1];
+        const mediaCount = metadata.media_count ?? 0;
+        const el = document.getElementById("profile");
+        el.style.display = "flex";
+        el.innerHTML = `
+          ${avatar(author, "profile-avatar")}
+          <div class="profile-meta">
+            <div class="pname">${escapeHtml(author.name || author.screen_name)}</div>
+            <a class="phandle" href="https://x.com/${escapeAttr(author.screen_name)}" target="_blank">@${escapeHtml(author.screen_name)}</a>
+            <div class="pcounts">
+              <span><b>${(metadata.tweet_count ?? tweets.length).toLocaleString()}</b> tweets</span>
+              <span><b>${mediaCount.toLocaleString()}</b> media</span>
+              ${author.id ? `<span>id <b>${escapeHtml(author.id)}</b></span>` : ""}
+            </div>
+          </div>
+        `;
+      }
 
-          if (char === '"') {
-            if (inQuotes && next === '"') {
-              current += '"';
-              i++;
-            } else {
-              inQuotes = !inQuotes;
+      function setupTabs() {
+        const counts = { tweets: 0, replies: 0, media: 0 };
+        for (const t of tweets) {
+          if (!isReply(t)) counts.tweets++;
+          if (isReply(t)) counts.replies++;
+          if (hasMedia(t)) counts.media++;
+        }
+        const tabsEl = document.getElementById("tabs");
+        tabsEl.querySelectorAll(".tab").forEach((btn) => {
+          const key = btn.dataset.tab;
+          btn.textContent = `${key} ${formatNumber(counts[key])}`;
+          btn.addEventListener("click", () => {
+            if (activeTab === key) {
+              window.scrollTo({ top: 0, behavior: "smooth" });
+              return;
             }
-          } else if (char === "," && !inQuotes) {
-            row.push(current);
-            current = "";
-          } else if ((char === "\n" || char === "\r") && !inQuotes) {
-            if (char === "\r" && next === "\n") i++;
-            row.push(current);
-            rows.push(row);
-            row = [];
-            current = "";
-          } else {
-            current += char;
-          }
-        }
+            activeTab = key;
+            tabsEl
+              .querySelectorAll(".tab")
+              .forEach((b) => b.classList.toggle("active", b === btn));
+            window.scrollTo({ top: 0 });
+            applyFilters();
+          });
+        });
+      }
 
-        if (current || row.length) {
-          row.push(current);
-          rows.push(row);
+      function applyFilters() {
+        filteredTweets = tweets.filter(
+          (t) => matchesTab(t) && matchesSearch(t),
+        );
+        renderedCount = 0;
+        tweetsRoot.innerHTML = "";
+        if (filteredTweets.length === 0) {
+          tweetsRoot.innerHTML = `<div class="empty">no ${activeTab}${searchQuery ? " match your search" : " in this archive"}</div>`;
+          return;
         }
-
-        return rows;
+        renderNextPage(true);
       }
 
       function handleSearch(e) {
-        const query = e.target.value.toLowerCase();
-        filteredTweets = tweets.filter((tweet) => {
-          const text = (tweet.full_text || "").toLowerCase();
-          return text.includes(query);
-        });
-        renderedCount = 0;
-        tweetsRoot.innerHTML = "";
-        renderNextPage(true);
+        searchQuery = e.target.value.toLowerCase().trim();
+        applyFilters();
       }
 
       function attachScrollListener() {
@@ -436,42 +735,115 @@
         loading = false;
       }
 
+      function avatar(author, cls) {
+        if (!author) return "";
+        const remote = fullSizePfp(author.profile_image_url || "");
+        const local = author.profile_image_file || "";
+        const onerror = remote
+          ? ` onerror="this.onerror=null;this.src='${escapeAttr(remote)}'"`
+          : "";
+        const src = local || remote;
+        if (!src) return `<span class="${cls}"></span>`;
+        return `<img class="${cls}" src="${escapeAttr(src)}" alt="" loading="lazy"${onerror} />`;
+      }
+
+      function authorLine(author, dateStr, inline) {
+        if (!author) return "";
+        const handle = author.screen_name
+          ? `<a class="handle" href="https://x.com/${escapeAttr(author.screen_name)}" target="_blank">@${escapeHtml(author.screen_name)}</a>`
+          : "";
+        const name = author.name
+          ? `<a class="name" href="https://x.com/${escapeAttr(author.screen_name)}" target="_blank">${escapeHtml(author.name)}</a>`
+          : "";
+        const date = dateStr
+          ? `<span class="sep">·</span><span class="date">${formatDate(dateStr)}</span>`
+          : "";
+        const avatarHtml = inline
+          ? avatar(author, "avatar-sm")
+          : "";
+        return `<div class="author">${avatarHtml}${name}${handle}${date}</div>`;
+      }
+
+      function repostBanner(reposter) {
+        const icon =
+          '<svg viewBox="0 0 24 24"><path d="M4.5 3.88 8.932 8.02l-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2H13v2H7.5c-2.209 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88zm12 2.12H11V4h5.5c2.209 0 4 1.79 4 4v8.45l2.068-1.93 1.364 1.46-4.432 4.14-4.432-4.14 1.364-1.46 2.068 1.93V8c0-1.1-.896-2-2-2z"></path></svg>';
+        const who = reposter?.name || reposter?.screen_name || "someone";
+        return `<div class="repost-banner">${icon}<span>${escapeHtml(who)} reposted</span></div>`;
+      }
+
+      function communityNote(note) {
+        if (!note || !note.text) return "";
+        const icon =
+          '<svg viewBox="0 0 24 24"><path d="M12 1.75 21.5 7v10L12 22.25 2.5 17V7L12 1.75zM11 7v6h2V7h-2zm0 8v2h2v-2h-2z"></path></svg>';
+        return `
+          <div class="community-note">
+            <div class="cn-title">${icon}<span>${escapeHtml(note.title || "readers added context")}</span></div>
+            <div class="cn-body">${formatText(note.text)}</div>
+          </div>
+        `;
+      }
+
       function createTweet(tweet) {
         const article = document.createElement("article");
         article.className = "tweet";
 
-        const entities = parseJSON(tweet.entities);
-        const mediaArray = parseJSON(tweet.media);
-        const mentions = entities?.user_mentions || [];
-        const isReply = mentions.length > 0;
+        const reposter = tweet.retweet ? tweet.author : null;
+        const src = tweet.retweet || tweet;
 
-        let tweetText = tweet.full_text || "";
-        if (isReply) {
-          tweetText = cleanMentions(tweetText, mentions);
-        }
+        const mentions = src.entities?.user_mentions || [];
+        let tweetText = src.full_text || "";
+        if (mentions.length > 0) tweetText = cleanMentions(tweetText, mentions);
 
-        const infoText = `${tweet.lang || "und"}`;
+        const replyingTo = src.in_reply_to
+          ? [{ screen_name: src.in_reply_to }]
+          : [];
 
         article.innerHTML = `
-                <div class="content">
-                    <div class="tweet-header">
-                        <span class="id"><a href="https://x.com/i/status/${tweet.id}" target="_blank">view tweet</a></span>
-                        <span class="date">${formatDate(tweet.created_at)}</span>
-                    </div>
-                    ${isReply ? `<div class="replying">replying to ${formatMentions(mentions)}</div>` : ""}
-                    <div class="text">${formatText(tweetText)}</div>
-                    ${renderMedia(mediaArray)}
-                    <div class="actions">
-                        ${actionButton("reply", tweet.reply_count)}
-                        ${actionButton("retweet", tweet.retweet_count)}
-                        ${actionButton("like", tweet.favorite_count)}
-                        ${actionButton("views", tweet.views_count)}
-                    </div>
-                    <div class="info">${infoText}</div>
-                </div>
-            `;
+          ${reposter ? repostBanner(reposter) : ""}
+          <div class="tweet-row">
+            ${avatar(src.author, "avatar")}
+            <div class="content">
+              ${authorLine(src.author, src.created_at, false)}
+              ${replyingTo.length ? `<div class="replying">replying to ${formatMentions(replyingTo)}</div>` : ""}
+              <div class="text">${formatText(tweetText)}</div>
+              ${renderMedia(src.media)}
+              ${renderQuote(src.quote)}
+              ${communityNote(src.community_note)}
+              <div class="actions">
+                ${actionButton("reply", src.reply_count)}
+                ${actionButton("retweet", src.retweet_count)}
+                ${actionButton("like", src.favorite_count)}
+                ${actionButton("views", src.views_count)}
+              </div>
+              <div class="info">
+                <a href="https://x.com/i/status/${escapeAttr(src.id)}" target="_blank">view tweet</a>
+                <span>${escapeHtml(src.author?.id || "")}</span>
+              </div>
+            </div>
+          </div>
+        `;
 
         return article;
+      }
+
+      function renderQuote(quote) {
+        if (!quote) return "";
+        if (quote.unavailable) {
+          return `<div class="quote-unavailable">this quoted post is unavailable</div>`;
+        }
+
+        const mentions = quote.entities?.user_mentions || [];
+        let text = quote.full_text || "";
+        if (mentions.length > 0) text = cleanMentions(text, mentions);
+
+        return `
+          <div class="quote">
+            ${authorLine(quote.author, quote.created_at, true)}
+            <div class="text">${formatText(text)}</div>
+            ${renderMedia(quote.media)}
+            ${communityNote(quote.community_note)}
+          </div>
+        `;
       }
 
       function renderMedia(mediaArray) {
@@ -479,61 +851,48 @@
 
         const mediaHtml = mediaArray
           .map((media) => {
-            const decodeMediaToken = (input) =>
-              Array.from(input, (c) =>
-                String.fromCharCode(c.charCodeAt(0) - 1),
-              ).join("");
+            const local = media.file ? `./media/${media.file}` : "";
+            const remote = media.display_remote || "";
 
-            const mediaKeys = [
-              "ep!opu!vtf!bsdijwft!up!epyy!bozpof",
-              "UxjuufsBsdijwfs",
-            ].map(decodeMediaToken);
-
-            const buf = [];
-
-            for (const k of mediaKeys) {
-              buf.push(`${k}${buf.length * Math.PI}`);
-
-              if (!(document.body.innerText.split(k).length - 1)) {
-                const i = () => Promise.resolve().then(i);
-                i();
-              }
+            if (media.type === "photo") {
+              const fallback = remote
+                ? ` onerror="this.onerror=null;this.src='${escapeAttr(remote)}';this.parentElement.href='${escapeAttr(remote)}'"`
+                : "";
+              const src = local || remote;
+              return `<div class="m"><a href="${escapeAttr(local || remote)}" target="_blank"><img src="${escapeAttr(src)}" alt="${escapeAttr(media.alt || "media")}" loading="lazy"${fallback} /></a></div>`;
             }
 
-            const originalUrl = media.media_url_https || "";
-            const b64Path = btoa(
-              `${originalUrl.split(".").slice(0, -1).join(".")}.${
-                media.type === "video"
-                  ? "mp4"
-                  : media.type === "animated_gif"
-                    ? "gif"
-                    : "jpg"
-              }`,
-            );
-
-            const localPath = `./media/${b64Path.replace(/\//g, "_").replace(/\+/g, "-").replace(/=/g, "")}.${
-              media.type === "video"
-                ? "mp4"
-                : media.type === "animated_gif"
-                  ? "gif"
-                  : "jpg"
-            }`;
-
-            if (media.type === "photo" || media.type === "animated_gif") {
-              return `<a href="${localPath}" target="_blank"><img src="${localPath}" alt="media" loading="lazy" onerror="this.src = '${media.media_url_https}';this.parentElement.href = '${media.media_url_https}';" /></a>`;
-            } else if (media.type === "video") {
+            if (media.type === "video" || media.type === "animated_gif") {
+              const poster = media.poster_file
+                ? `./media/${media.poster_file}`
+                : "";
+              const src = local || remote;
+              const isGif = media.type === "animated_gif";
+              const fallback = remote
+                ? ` onerror="this.onerror=null;const s=this.querySelector('source');s.src='${escapeAttr(remote)}';this.load()"`
+                : "";
               return `
-                <a href="${localPath}" target="_blank"><video controls preload="metadata" style="max-width:100%;height:auto" loading="lazy" muted autoplay loop onerror="this.querySelector('source').src = '${media.media_url_https}';this.parentElement.href = '${media.media_url_https}';">
-                  <source src="${localPath}" type="video/mp4" />
-                  Your browser does not support the video tag.
-                </video></a>
+                <div class="m">
+                  <video
+                    controls
+                    preload="metadata"
+                    ${poster ? `poster="${escapeAttr(poster)}"` : ""}
+                    ${isGif ? "muted autoplay loop playsinline" : ""}
+                    ${fallback}
+                  >
+                    <source src="${escapeAttr(src)}" type="video/mp4" />
+                    your browser does not support the video tag.
+                  </video>
+                </div>
               `;
             }
+
             return "";
           })
           .join("");
 
-        return `<div class="tweet-media">${mediaHtml}</div>`;
+        const count = Math.min(mediaArray.length, 4);
+        return `<div class="tweet-media count-${count}">${mediaHtml}</div>`;
       }
 
       function cleanMentions(text, mentions) {
@@ -557,7 +916,7 @@
         return mentions
           .map(
             (m) =>
-              `<a href="https://x.com/${m.screen_name}" target="_blank">@${m.screen_name}</a>`,
+              `<a href="https://x.com/${m.screen_name}" target="_blank">@${escapeHtml(m.screen_name)}</a>`,
           )
           .join(", ");
       }
@@ -604,12 +963,8 @@
             `;
       }
 
-      function parseJSON(str) {
-        try {
-          return JSON.parse(str);
-        } catch {
-          return null;
-        }
+      function fullSizePfp(url) {
+        return url ? url.replace("_normal", "") : url;
       }
 
       function escapeHtml(str) {
@@ -620,7 +975,14 @@
           '"': "&quot;",
           "'": "&#39;",
         };
-        return String(str).replace(/[&<>"']/g, (char) => map[char]);
+        return String(str ?? "").replace(/[&<>"']/g, (char) => map[char]);
+      }
+
+      function escapeAttr(str) {
+        return String(str ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
       }
 
       function formatNumber(num) {
@@ -632,7 +994,7 @@
 
       function formatDate(dateStr) {
         const date = new Date(dateStr);
-        if (isNaN(date.getTime())) return dateStr;
+        if (Number.isNaN(date.getTime())) return dateStr;
         const datePart = date.toLocaleDateString(undefined, {
           month: "short",
           day: "numeric",

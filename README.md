@@ -1,6 +1,6 @@
 # TwitterArchiver
 
-export anyone's tweets and media into a zip with an html viewer and csv.
+export anyone's tweets and media into a zip with an html viewer. captures photos, videos, gifs, quote tweets (with their own media), community notes, and every author's profile picture, name, handle and id. the viewer has tweets / replies / media tabs just like a real profile.
 
 ## installation
   
@@ -35,11 +35,11 @@ bun make
 
 2. enter of search for the twitter handle of the user you want to archive. you can click any profile on the list.
 
-3. tap "start archiving" and wait until you've archived as many tweets as you want. you can always pause to edit the search query. once you're done, tap "finish" and select a download location
+3. tap "start archiving". it walks the whole history automatically with `from:user` search, moving the `until:` date backward to dig past the ~3200 cap a normal profile timeline stops at. if it stops getting new posts for 20s (rate limit or dead scroll) it reloads and continues from where it left off, giving up only after a few empty reloads in a row. you can pause anytime. when the progress says it's done (or whenever you've got enough), tap "finish" and pick a download location.
 
 ### viewing your archive
 
-your archive file is a zip that contains an html viewer, a csv with all tweets data and a folder with all of the media.
+your archive file is a zip that contains an html viewer, a `tweets.json` with all tweet data (including quotes and full author info), a `media/` folder with all images/videos/gifs, and a `pfps/` folder with every author's profile picture.
 
 ![](./assets/screenshot__3.png)
 

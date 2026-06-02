@@ -5,4 +5,5 @@ contextBridge.exposeInMainWorld("ipc", {
 		ipcRenderer.send(channel, data);
 	},
 	on: (channel, fn) => ipcRenderer.on(channel, (_, ...args) => fn(...args)),
+	invoke: (channel, data) => ipcRenderer.invoke(channel, data),
 });

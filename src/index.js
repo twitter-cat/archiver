@@ -92,7 +92,7 @@ const createWindow = () => {
 		...(process.platform === "darwin"
 			? { titleBarStyle: "hidden", trafficLightPosition: { x: 16, y: 16 } }
 			: {}),
-		icon: path.join(import.meta.dirname, "src/assets/icon.png"),
+		icon: path.join(import.meta.dirname, "assets/icon.png"),
 		backgroundColor: "#15171a",
 		webPreferences: {
 			preload: path.join(__dirname, "preload.js"),
@@ -123,6 +123,35 @@ const createWindow = () => {
 
 	app.dock.setIcon(nativeImage.createFromPath("src/assets/dockIcon.png"));
 };
+
+// Fetch media through the webview's authenticated session. This runs in the
+// main process (no CORS), reuses the partition's HTTP cache (so anything the
+// timeline already loaded comes back without re-downloading), and carries the
+// auth cookies that video.twimg.com / pbs.twimg.com need.
+ipcMain.handle("fetch-media", async (_evt, url) => {
+	if (typeof url !== "string" || !/^https:\/\//.test(url)) return null;
+	const ses = session.fromPartition("persist:twitter");
+	for (let attempt = 0; attempt < 3; attempt++) {
+		try {
+			const res = await ses.fetch(url, {
+				headers: { referer: "https://x.com/", origin: "https://x.com" },
+			});
+			if (!res.ok) {
+				if (res.status === 404 || res.status === 403) return null;
+				throw new Error(`HTTP ${res.status}`);
+			}
+			const buf = Buffer.from(await res.arrayBuffer());
+			return buf.length ? new Uint8Array(buf) : null;
+		} catch (err) {
+			if (attempt === 2) {
+				console.error("fetch-media failed:", url, err.message);
+				return null;
+			}
+			await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+		}
+	}
+	return null;
+});
 
 ipcMain.on("from-renderer", async (evt, data) => {
 	if (data === "request-auth") {

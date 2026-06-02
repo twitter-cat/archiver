@@ -360,19 +360,46 @@ body {
         padding: 10px 12px;
         margin-bottom: 8px;
 
-        .tweet-header {
+        .tweet-author {
           display: flex;
           align-items: center;
           gap: 8px;
           margin-bottom: 6px;
           user-select: none;
 
-          .tweet-date {
-            font-size: 0.8em;
+          .avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            background: rgba(255, 255, 255, 0.1);
+            object-fit: cover;
+          }
+
+          .meta {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            line-height: 1.2;
+          }
+
+          .name {
+            font-size: 0.85em;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+
+          .sub {
+            font-size: 0.75em;
             opacity: 0.5;
           }
 
-          .has-media {
+          .badges {
+            margin-left: auto;
+            display: flex;
+            gap: 4px;
             font-size: 0.85em;
           }
         }

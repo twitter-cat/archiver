@@ -337,65 +337,211 @@
       }
     }
 
-    function getMediaUrls(tweetObj) {
-      const urls = [];
-
-      try {
-        const media =
-          tweetObj?.legacy?.extended_entities?.media ||
-          tweetObj?.legacy?.entities?.media ||
-          [];
-
-        for (const m of media) {
-          if (m.type === "photo") {
-            const url = m.media_url_https + "?format=jpg&name=orig";
-            urls.push({ url, type: "photo", original_url: m.media_url_https });
-          } else if (m.type === "video" || m.type === "animated_gif") {
-            const variants = m.video_info?.variants || [];
-            const mp4Variants = variants.filter(
-              (v) => v.content_type === "video/mp4",
-            );
-            if (mp4Variants.length > 0) {
-              mp4Variants.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
-              urls.push({
-                url: mp4Variants[0].url,
-                type: m.type,
-                original_url: m.media_url_https,
-              });
-            }
-          }
-        }
-      } catch (err) {
-        console.error("Error extracting media URLs:", err);
+    function unwrapTweet(result) {
+      if (!result) return null;
+      if (result.__typename === "TweetWithVisibilityResults") {
+        return result.tweet ?? null;
       }
-
-      return urls;
+      return result;
     }
 
-    function urlToBase64Filename(url) {
-      const cleanUrl = url.split("?")[0];
-      const encoded = btoa(cleanUrl)
-        .replace(/\//g, "_")
-        .replace(/\+/g, "-")
-        .replace(/=/g, "");
+    function fullSizePfp(url) {
+      return url ? url.replace("_normal", "") : url;
+    }
 
-      let ext = ".jpg";
-      if (url.includes(".png")) ext = ".png";
-      else if (url.includes(".mp4") || url.includes("video")) ext = ".mp4";
-      else if (url.includes(".gif")) ext = ".gif";
+    function ymd(date) {
+      const p = (n) => String(n).padStart(2, "0");
+      return `${date.getUTCFullYear()}-${p(date.getUTCMonth() + 1)}-${p(date.getUTCDate())}`;
+    }
 
-      return encoded + ext;
+    function extractUser(userResult) {
+      if (!userResult) return null;
+      const legacy = userResult.legacy ?? {};
+      const core = userResult.core ?? {};
+      const id = userResult.rest_id ?? legacy.id_str ?? "";
+      const name = core.name ?? legacy.name ?? "";
+      const screen_name = core.screen_name ?? legacy.screen_name ?? "";
+      const profile_image_url =
+        userResult.avatar?.image_url ?? legacy.profile_image_url_https ?? "";
+      return {
+        id,
+        name,
+        screen_name,
+        profile_image_url,
+        profile_image_file: id ? `pfps/${id}.jpg` : "",
+      };
+    }
+
+    function tweetText(result, legacy) {
+      return (
+        result?.note_tweet?.note_tweet_results?.result?.text ??
+        legacy?.full_text ??
+        ""
+      );
+    }
+
+    function extractMedia(legacy) {
+      const media =
+        legacy?.extended_entities?.media ?? legacy?.entities?.media ?? [];
+
+      return media
+        .map((m, i) => {
+          const key = m.media_key ?? m.id_str ?? `${legacy?.id_str}-${i}`;
+          const alt = m.ext_alt_text ?? "";
+
+          if (m.type === "photo") {
+            const ext = (m.media_url_https ?? "").includes(".png")
+              ? "png"
+              : "jpg";
+            return {
+              type: "photo",
+              key,
+              alt,
+              file: `${key}.${ext}`,
+              remote: `${m.media_url_https}?format=${ext}&name=orig`,
+              display_remote: m.media_url_https,
+            };
+          }
+
+          if (m.type === "video" || m.type === "animated_gif") {
+            const variants = (m.video_info?.variants ?? []).filter(
+              (v) => v.content_type === "video/mp4",
+            );
+            variants.sort((a, b) => (b.bitrate ?? 0) - (a.bitrate ?? 0));
+            const best = variants[0];
+            if (!best) return null;
+            return {
+              type: m.type,
+              key,
+              alt,
+              file: `${key}.mp4`,
+              remote: best.url,
+              poster_file: `${key}-poster.jpg`,
+              poster_remote: m.media_url_https,
+              display_remote: best.url,
+              aspect_ratio: m.video_info?.aspect_ratio ?? null,
+            };
+          }
+
+          return null;
+        })
+        .filter(Boolean);
+    }
+
+    function communityNote(result) {
+      const pivot = result?.birdwatch_pivot;
+      const text = pivot?.subtitle?.text ?? "";
+      if (!text) return null;
+      return {
+        title: pivot.title ?? "readers added context",
+        text,
+      };
+    }
+
+    function buildQuote(quotedRaw) {
+      const quoted = unwrapTweet(quotedRaw);
+      if (!quoted?.legacy) return { unavailable: true };
+      return {
+        id: quoted.legacy.id_str ?? quoted.rest_id,
+        created_at: quoted.legacy.created_at,
+        full_text: tweetText(quoted, quoted.legacy),
+        entities: quoted.legacy.entities ?? {},
+        author: extractUser(quoted.core?.user_results?.result),
+        media: extractMedia(quoted.legacy),
+        community_note: communityNote(quoted),
+      };
+    }
+
+    function buildRecord(rawResult, depth = 0) {
+      try {
+        const result = unwrapTweet(rawResult);
+        const legacy = result?.legacy;
+        if (!result || !legacy) return null;
+
+        const record = {
+          id: legacy.id_str ?? result.rest_id,
+          created_at: legacy.created_at,
+          full_text: tweetText(result, legacy),
+          lang: legacy.lang ?? "",
+          source: result.source ?? "",
+          reply_count: legacy.reply_count ?? 0,
+          retweet_count: legacy.retweet_count ?? 0,
+          favorite_count: legacy.favorite_count ?? 0,
+          quote_count: legacy.quote_count ?? 0,
+          bookmark_count: legacy.bookmark_count ?? 0,
+          views_count: result.views?.count ?? "",
+          possibly_sensitive: legacy.possibly_sensitive ?? false,
+          in_reply_to: legacy.in_reply_to_screen_name ?? "",
+          entities: legacy.entities ?? {},
+          author: extractUser(result.core?.user_results?.result),
+          media: extractMedia(legacy),
+          community_note: communityNote(result),
+          is_retweet: !!legacy.retweeted_status_result,
+          retweet: null,
+          quote: null,
+        };
+
+        const retweetedRaw = legacy.retweeted_status_result?.result;
+        if (retweetedRaw && depth === 0) {
+          record.retweet = buildRecord(retweetedRaw, depth + 1);
+        }
+
+        const quotedRaw = result.quoted_status_result?.result;
+        if (quotedRaw) {
+          record.quote = buildQuote(quotedRaw);
+        }
+
+        return record;
+      } catch (err) {
+        console.error("Error building tweet record:", err);
+        return null;
+      }
+    }
+
+    function collectDownloads(record, tasks) {
+      const addPfp = (author) => {
+        if (author?.profile_image_file && author.profile_image_url) {
+          if (!tasks.has(author.profile_image_file)) {
+            tasks.set(author.profile_image_file, fullSizePfp(author.profile_image_url));
+          }
+        }
+      };
+      const addMedia = (mediaList) => {
+        for (const m of mediaList ?? []) {
+          if (m.file && m.remote && !tasks.has(`media/${m.file}`)) {
+            tasks.set(`media/${m.file}`, m.remote);
+          }
+          if (m.poster_file && m.poster_remote && !tasks.has(`media/${m.poster_file}`)) {
+            tasks.set(`media/${m.poster_file}`, m.poster_remote);
+          }
+        }
+      };
+
+      const addTweet = (rec) => {
+        if (!rec) return;
+        addPfp(rec.author);
+        addMedia(rec.media);
+        if (rec.quote && !rec.quote.unavailable) {
+          addPfp(rec.quote.author);
+          addMedia(rec.quote.media);
+        }
+      };
+
+      addTweet(record);
+      addTweet(record.retweet);
     }
 
     async function fetchMediaAsBlob(url) {
+      // Pull bytes through the main process / webview session: no CORS wall,
+      // carries the auth cookies videos need, and reuses the partition cache
+      // for anything the timeline already loaded.
       try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return await response.blob();
+        const bytes = await window.ipc.invoke("fetch-media", url);
+        if (bytes && bytes.byteLength) return new Blob([bytes]);
       } catch (err) {
         console.error(`Failed to fetch media: ${url}`, err);
-        return null;
       }
+      return null;
     }
 
     async function downloadExport() {
@@ -410,121 +556,84 @@
       progressText.textContent = "creating export...";
 
       const zip = new JSZip();
-      const mediaFolder = zip.folder("media");
 
-      const allMedia = [];
-      for (const tweetObj of fullTweetObjects.values()) {
-        const mediaUrls = getMediaUrls(tweetObj);
-        for (const m of mediaUrls) {
-          allMedia.push(m);
-        }
+      progressText.textContent = "processing tweets...";
+
+      const records = [];
+      for (const raw of fullTweetObjects.values()) {
+        const record = buildRecord(raw);
+        if (record && isTargetAuthor(record)) records.push(record);
       }
 
-      let fetchedCount = 0;
-      const totalMedia = allMedia.length;
-      const mediaMap = new Map();
-
-      for (const m of allMedia) {
-        const filename = urlToBase64Filename(m.url);
-        mediaMap.set(m.url, filename);
-
-        progressText.textContent = `fetching media ${fetchedCount + 1}/${totalMedia}...`;
-
-        const blob = await fetchMediaAsBlob(m.url);
-        if (blob) {
-          mediaFolder.file(filename, blob);
+      records.sort((a, b) => {
+        try {
+          return BigInt(b.id ?? 0) > BigInt(a.id ?? 0) ? 1 : -1;
+        } catch {
+          return 0;
         }
-
-        fetchedCount++;
-      }
-
-      progressText.textContent = "writing tweets...";
-      const tweetsArray = Array.from(fullTweetObjects.values());
-
-      const header = [
-        "__typename",
-        "id",
-        "unmention_data",
-        "edit_tweet_ids",
-        "views_count",
-        "source",
-        "bookmark_count",
-        "created_at",
-        "display_text_range",
-        "entities",
-        "media",
-        "favorite_count",
-        "full_text",
-        "lang",
-        "is_quote_status",
-        "possibly_sensitive",
-        "quote_count",
-        "reply_count",
-        "retweet_count",
-        "author",
-        "quote_id",
-        "quote_author",
-        "quote_full_text",
-      ].join(",");
-
-      const escapeCSV = (value) => {
-        if (value === null || value === undefined) return "";
-        const str = `${value}`;
-        if (str.includes(`"`) || str.includes(",") || str.includes("\n")) {
-          return `"${str.replace(/"/g, `""`)}"`;
-        }
-        return str;
-      };
-
-      const rows = tweetsArray.map((tweet) => {
-        const legacy = tweet.legacy ?? {};
-        const quote = tweet.quoted_status_result?.result ?? null;
-
-        return [
-          tweet.__typename,
-          tweet.rest_id ?? tweet.id_str,
-          JSON.stringify(tweet.unmention_data ?? {}),
-          JSON.stringify(tweet.edit_control?.edit_tweet_ids ?? []),
-          tweet.views?.count ?? "",
-          tweet.source ?? "",
-          legacy.bookmark_count ?? "",
-          legacy.created_at ?? "",
-          legacy.display_text_range
-            ? `${legacy.display_text_range[0]}:${legacy.display_text_range[1]}`
-            : "",
-          JSON.stringify(legacy.entities ?? {}),
-          JSON.stringify(legacy.extended_entities?.media ?? []),
-          legacy.favorite_count ?? "",
-          legacy.full_text ?? "",
-          legacy.lang ?? "",
-          legacy.is_quote_status ?? false,
-          legacy.possibly_sensitive ?? false,
-          legacy.quote_count ?? 0,
-          legacy.reply_count ?? 0,
-          legacy.retweet_count ?? 0,
-          tweet.user_id_str ?? "",
-          quote?.rest_id ?? "",
-          quote?.core?.user_results?.result?.rest_id ?? "",
-          quote?.legacy?.full_text ?? "",
-        ]
-          .map(escapeCSV)
-          .join(",");
       });
 
-      const csv = `${header}\n${rows.join("\n")}`;
+      const tasks = new Map();
+      for (const record of records) {
+        collectDownloads(record, tasks);
+      }
 
-      zip.file("tweets.csv", csv);
+      const entries = [...tasks.entries()];
+      const total = entries.length;
+      let fetchedCount = 0;
+      let cursor = 0;
+      const concurrency = 8;
+
+      const worker = async () => {
+        while (cursor < entries.length) {
+          const [file, url] = entries[cursor++];
+          const blob = await fetchMediaAsBlob(url);
+          if (blob) zip.file(file, blob);
+          fetchedCount++;
+          if (fetchedCount % 5 === 0 || fetchedCount === total) {
+            progressText.textContent = `downloading media ${fetchedCount}/${total}...`;
+          }
+        }
+      };
+
+      await Promise.all(
+        Array.from({ length: Math.min(concurrency, entries.length || 1) }, worker),
+      );
+
+      progressText.textContent = "writing tweets...";
+
+      const tweetMediaCount = (r) =>
+        (r.media?.length ?? 0) +
+        (r.quote && !r.quote.unavailable ? (r.quote.media?.length ?? 0) : 0);
+      const mediaCount = records.reduce(
+        (sum, r) =>
+          sum + tweetMediaCount(r) + (r.retweet ? tweetMediaCount(r.retweet) : 0),
+        0,
+      );
+
+      zip.file("tweets.json", JSON.stringify(records));
 
       const metadata = {
         username: currentUsername,
         exported_at: new Date().toISOString().split(".")[0],
-        tweet_count: fullTweetObjects.size,
-        media_count: allMedia.length,
+        tweet_count: records.length,
+        media_count: mediaCount,
       };
       zip.file("metadata.json", JSON.stringify(metadata, null, 2));
       zip.file(
         "index.html",
         await (await fetch("./__viewer_template.html")).text(),
+      );
+
+      progressText.textContent = "bundling fonts...";
+      const fontFiles = ["chirp.woff2", "chirpbold.woff2", "chirpheavy.woff2"];
+      await Promise.all(
+        fontFiles.map(async (name) => {
+          const blob = await fetchMediaAsBlob(
+            `https://twitter.cat/assets/fonts/${name}`,
+          );
+          if (blob) zip.file(`fonts/${name}`, blob);
+        }),
       );
 
       progressText.textContent = "Generating zip file...";
@@ -552,27 +661,15 @@
       progressText.textContent = "Export complete!";
     }
 
-    async function stopArchiving() {
-      if (fullTweetObjects.size === 0) {
-        alert("no tweets to export!");
-        return;
-      }
-
-      if (!confirm("are you sure you want to stop this archive?")) return;
-
-      isPaused = true;
+    function goHome() {
+      isArchiving = false;
+      isPaused = false;
       if (scrollInterval) {
         clearInterval(scrollInterval);
         scrollInterval = null;
       }
 
-      await downloadExport();
-
-      isArchiving = false;
-      isPaused = false;
-
       document.querySelector(".archive-container").style.display = "none";
-
       document.querySelector(".ui").style.display = "flex";
       document.querySelector(".archiving-ui").style.display = "none";
 
@@ -585,6 +682,23 @@
 
       const webview = document.getElementById("twitter-webview");
       webview.src = "about:blank";
+    }
+
+    async function stopArchiving() {
+      // nothing captured yet: just stop and go home, no nagging.
+      if (fullTweetObjects.size === 0) {
+        goHome();
+        return;
+      }
+
+      isPaused = true;
+      if (scrollInterval) {
+        clearInterval(scrollInterval);
+        scrollInterval = null;
+      }
+
+      await downloadExport();
+      goHome();
     }
 
     loginButton.addEventListener("click", async () => {
@@ -669,28 +783,125 @@
             } catch (err) {
               console.error("Error parsing tweet data:", err);
             }
+          } else if (e.message.startsWith("TWEET_RATELIMIT:")) {
+            // payload is the x-rate-limit-reset epoch (seconds), or 0 if unknown.
+            const reset = parseInt(e.message.slice(16), 10);
+            const until = reset > 0 ? reset * 1000 : Date.now() + 60000;
+            // honor the reset, but cap the wait in case of a bogus header.
+            rateLimitUntil = Math.min(
+              Date.now() + 16 * 60 * 1000,
+              Math.max(rateLimitUntil, until),
+            );
           }
         });
 
-        webview.addEventListener("did-finish-load", () => {
-          if (!isArchiving) return;
+        const STALL_MS = 20000;
+        const MAX_EMPTY_RELOADS = 3;
+        const MAX_RL_WAITS = 6;
 
-          webview.executeJavaScript(`
+        // Search-only archive. Scroll the `from:user` timeline.
+        //  - Rate limits are explicit: the API interceptor reads the 429 /
+        //    errors-88 / x-rate-limit-* headers and sets rateLimitUntil to the
+        //    reset epoch. We idle until then, reload, and keep going — this is
+        //    NEVER treated as "done" (only bounded by MAX_RL_WAITS with no
+        //    progress, as a stuck-account safety net).
+        //  - A genuine stall (20s with no new posts and NO rate-limit signal)
+        //    means we've likely hit the end: reload from where we left off, and
+        //    after MAX_EMPTY_RELOADS such empty reloads in a row, stop.
+        let rateLimitUntil = 0;
+        let rlWaits = 0;
+        let searchUntil = new Date(Date.now() + 86400000);
+        let roundStartSize = 0;
+        let lastSize = -1;
+        let lastNewAt = Date.now();
+        let emptyReloads = 0;
+        let advancing = false;
+
+        const setProgress = (text) => {
+          const el = document.querySelector(".progress-text");
+          if (el) el.textContent = text;
+        };
+
+        const oldestCapturedTs = () => {
+          let min = Infinity;
+          for (const r of archivedTweets.values()) {
+            const ts = Date.parse(r?.created_at);
+            if (!Number.isNaN(ts) && ts < min) min = ts;
+          }
+          return min;
+        };
+
+        const loadSearch = (label) => {
+          advancing = true;
+          roundStartSize = archivedTweets.size;
+          lastSize = archivedTweets.size;
+          lastNewAt = Date.now();
+          // first round: plain newest-first search (boots the SPA cleanly).
+          // later rounds: append the moving `until:` ceiling.
+          const isFirst = searchUntil.getTime() > Date.now();
+          const terms = isFirst
+            ? `from:${username}`
+            : `from:${username} until:${ymd(searchUntil)}`;
+          const q = encodeURIComponent(terms);
+          setProgress(label);
+          webview.src = `https://x.com/search?q=${q}&src=typed_query&f=live`;
+          setTimeout(() => {
+            advancing = false;
+          }, 3000);
+        };
+
+        // resume from the oldest post we have, so the reload continues deeper
+        // rather than re-scrolling the part we already captured.
+        const reloadDeeper = (label) => {
+          const oldestTs = oldestCapturedTs();
+          if (Number.isFinite(oldestTs)) searchUntil = new Date(oldestTs);
+          loadSearch(label);
+        };
+
+        const finishScan = () => {
+          clearInterval(scrollInterval);
+          scrollInterval = null;
+          setProgress(
+            `done — found ${archivedTweets.size} posts. click finish to export`,
+          );
+        };
+
+        const installInterceptor = () => {
+          webview
+            .executeJavaScript(`
           (function() {
             if (window.__interceptorInstalled) return;
             window.__interceptorInstalled = true;
+
+            // search-only: we only ever drive SearchTimeline. ignoring other
+            // endpoints means clicking into a tweet/profile won't pull in posts
+            // from other people.
+            const ENDPOINTS = /SearchTimeline/;
+
+            const hasRateError = (data) => {
+              const errs = data && data.errors;
+              return Array.isArray(errs) && errs.some(
+                (e) => e && (e.code === 88 || /rate limit|over capacity/i.test(e.message || "")),
+              );
+            };
 
             const originalFetch = window.fetch;
             window.fetch = async function(...args) {
               const response = await originalFetch.apply(this, args);
               const url = args[0]?.url || args[0];
 
-              if (url && typeof url === 'string' && url.includes('/SearchTimeline')) {
+              if (url && typeof url === 'string' && ENDPOINTS.test(url)) {
+                let data = null;
                 try {
                   const clone = response.clone();
-                  const data = await clone.json();
+                  data = await clone.json();
                   console.debug("TWEET_DATA:" + JSON.stringify(data));
                 } catch (e) {}
+                const remaining = response.headers.get('x-rate-limit-remaining');
+                const reset = response.headers.get('x-rate-limit-reset');
+                if (response.status === 429 || hasRateError(data) || remaining === '0') {
+                  console.debug("TWEET_RATELIMIT:" + (reset || '0'));
+                }
               }
 
               return response;
@@ -706,11 +917,17 @@
 
             XMLHttpRequest.prototype.send = function(...args) {
               this.addEventListener("load", function() {
-                if (this._url && this._url.includes('/SearchTimeline')) {
+                if (this._url && ENDPOINTS.test(this._url)) {
+                  let data = null;
                   try {
-                    const data = JSON.parse(this.responseText);
+                    data = JSON.parse(this.responseText);
                     console.debug("TWEET_DATA:" + JSON.stringify(data));
                   } catch (e) {}
+                  const remaining = this.getResponseHeader('x-rate-limit-remaining');
+                  const reset = this.getResponseHeader('x-rate-limit-reset');
+                  if (this.status === 429 || hasRateError(data) || remaining === '0') {
+                    console.debug("TWEET_RATELIMIT:" + (reset || '0'));
+                  }
                 }
               });
               return originalXHRSend.apply(this, args);
@@ -718,39 +935,102 @@
 
             console.debug("interceptor installed!!");
           })();
-        `);
+        `)
+            .catch(() => {});
+        };
 
-          setTimeout(() => {
-            if (scrollInterval) clearInterval(scrollInterval);
-            scrollInterval = setInterval(() => {
-              if (!isArchiving) {
-                clearInterval(scrollInterval);
-                return;
-              }
-
-              if (isPaused) return;
-
-              webview
-                .executeJavaScript(
-                  `
-              window.scrollBy(0, 1000);
-              document.documentElement.scrollHeight;
-            `,
-                )
-                .then((scrollHeight) => {
-                  webview
-                    .executeJavaScript(`window.innerHeight + window.scrollY`)
-                    .then((scrollPos) => {
-                      if (scrollPos >= scrollHeight - 100) {
-                        // near the bottom, wait a bit for more content to load
-                      }
-                    });
-                });
-            }, 400);
-          }, 1500);
+        // Re-inject on every navigation (each full load resets window, and the
+        // in-page guard prevents double-install within one document).
+        webview.addEventListener("dom-ready", () => {
+          if (isArchiving) installInterceptor();
         });
-        const searchUrl = `https://x.com/search?q=from%3A${encodeURIComponent(username)}&src=typed_query&f=live`;
-        webview.src = searchUrl;
+
+        // scroll + flag X's "Retry"/"Try again" button (a visible rate-limit
+        // cue, used only to label progress — the 20s timer drives the reload).
+        const PROBE_JS = `(function(){
+          window.scrollBy(0, 1400);
+          var nodes = document.querySelectorAll('button,[role="button"],a');
+          for (var i = 0; i < nodes.length; i++) {
+            var t = (nodes[i].textContent || "").trim().toLowerCase();
+            if (t === "retry" || t === "try again") return "1";
+          }
+          return "0";
+        })()`;
+
+        if (scrollInterval) clearInterval(scrollInterval);
+        scrollInterval = setInterval(async () => {
+          if (!isArchiving) {
+            clearInterval(scrollInterval);
+            scrollInterval = null;
+            return;
+          }
+          if (isPaused || advancing) return;
+
+          // rate limited (caught by the interceptor): idle until the reset, then
+          // reload and continue. never counted toward the empty-reload stop.
+          if (Date.now() < rateLimitUntil) {
+            const secs = Math.ceil((rateLimitUntil - Date.now()) / 1000);
+            setProgress(
+              `rate limited — waiting ${secs}s for reset… ${archivedTweets.size} found`,
+            );
+            return;
+          }
+          if (rateLimitUntil) {
+            rateLimitUntil = 0;
+            if (++rlWaits > MAX_RL_WAITS) {
+              finishScan();
+              return;
+            }
+            reloadDeeper(`resuming after rate limit… ${archivedTweets.size} found`);
+            return;
+          }
+
+          const probe = await webview
+            .executeJavaScript(PROBE_JS)
+            .catch(() => "0");
+
+          const size = archivedTweets.size;
+          if (size > lastSize) {
+            lastSize = size;
+            lastNewAt = Date.now();
+            // any new post breaks both "we're stuck" streaks immediately, even
+            // if the round is about to be interrupted by a rate-limit wait.
+            rlWaits = 0;
+            emptyReloads = 0;
+          }
+
+          // visible "Retry"/"Try again" button but no header signal: fall back
+          // to a 60s wait (covers a throttle whose response we didn't intercept).
+          if (probe === "1") {
+            rateLimitUntil = Date.now() + 60000;
+            return;
+          }
+
+          // still pulling in posts: keep scrolling.
+          if (Date.now() - lastNewAt < STALL_MS) return;
+
+          // 20s with no new posts and no rate-limit signal: likely the real end.
+          // reload from the oldest we have and continue deeper if there's more.
+          const newThisRound = size - roundStartSize;
+          if (newThisRound > 0) {
+            // (emptyReloads already zeroed when those posts arrived)
+            reloadDeeper(`archiving history… ${size} found, continuing`);
+            return;
+          }
+
+          // reload brought nothing new and we weren't throttled. after a few of
+          // these in a row, the history really is exhausted -> stop.
+          emptyReloads++;
+          if (emptyReloads >= MAX_EMPTY_RELOADS) {
+            finishScan();
+            return;
+          }
+          reloadDeeper(
+            `no new posts — retry ${emptyReloads}/${MAX_EMPTY_RELOADS}… ${size} found`,
+          );
+        }, 400);
+
+        loadSearch(`archiving newest posts… ${archivedTweets.size} found`);
       }
 
       if (e.type === "archive-error") {
@@ -758,41 +1038,58 @@
       }
     });
 
+    function collectTweetResults(node, out, seen) {
+      if (!node || typeof node !== "object") return;
+      if (seen.has(node)) return;
+      seen.add(node);
+
+      if (Array.isArray(node)) {
+        for (const item of node) collectTweetResults(item, out, seen);
+        return;
+      }
+
+      for (const [key, value] of Object.entries(node)) {
+        if (
+          key === "tweet_results" &&
+          value &&
+          typeof value === "object" &&
+          value.result
+        ) {
+          out.push(value.result);
+        }
+        if (value && typeof value === "object") {
+          collectTweetResults(value, out, seen);
+        }
+      }
+    }
+
+    // Only keep posts actually authored by the target. Guards against stray
+    // tweets pulled in when other endpoints fire (e.g. opening a conversation
+    // shows replies from other people).
+    function isTargetAuthor(record) {
+      const target = (currentUsername || "").toLowerCase();
+      const author = (record?.author?.screen_name || "").toLowerCase();
+      return !!target && author === target;
+    }
+
     function processTweetData(data) {
       try {
-        const instructions =
-          data?.data?.search_by_raw_query?.search_timeline?.timeline
-            ?.instructions || [];
+        const results = [];
+        collectTweetResults(data, results, new WeakSet());
 
-        for (const instruction of instructions) {
-          const entries = instruction.entries || [];
-          for (const entry of entries) {
-            if (entry.content?.itemContent?.tweet_results?.result) {
-              const tweetResult =
-                entry.content.itemContent.tweet_results.result;
-              const tweetId = getTweetId(tweetResult);
-              if (tweetId && !archivedTweets.has(tweetId)) {
-                archivedTweets.set(tweetId, extractTweetInfo(tweetResult));
-                fullTweetObjects.set(tweetId, tweetResult);
-                updateArchiveUI(extractTweetInfo(tweetResult));
-              }
-            }
+        for (const tweetResult of results) {
+          const tweetId = getTweetId(tweetResult);
+          if (!tweetId || archivedTweets.has(tweetId)) continue;
 
-            if (entry.content?.items) {
-              for (const item of entry.content.items) {
-                if (item.item?.itemContent?.tweet_results?.result) {
-                  const tweetResult =
-                    item.item.itemContent.tweet_results.result;
-                  const tweetId = getTweetId(tweetResult);
-                  if (tweetId && !archivedTweets.has(tweetId)) {
-                    archivedTweets.set(tweetId, extractTweetInfo(tweetResult));
-                    fullTweetObjects.set(tweetId, tweetResult);
-                    updateArchiveUI(extractTweetInfo(tweetResult));
-                  }
-                }
-              }
-            }
-          }
+          const unwrapped = unwrapTweet(tweetResult);
+          if (!unwrapped?.legacy) continue;
+
+          const record = buildRecord(tweetResult);
+          if (!isTargetAuthor(record)) continue;
+
+          archivedTweets.set(tweetId, record);
+          fullTweetObjects.set(tweetId, tweetResult);
+          updateArchiveUI(record);
         }
       } catch (err) {
         console.error("Error processing tweet data:", err);
@@ -810,62 +1107,19 @@
       }
     }
 
-    function extractTweetInfo(tweetResult) {
-      try {
-        if (tweetResult.__typename === "TweetWithVisibilityResults") {
-          tweetResult = tweetResult.tweet;
-        }
-
-        if (!tweetResult || tweetResult.__typename !== "Tweet") {
-          return null;
-        }
-
-        const legacy = tweetResult.legacy;
-        const user = tweetResult.core?.user_results?.result?.legacy;
-
-        if (!legacy || !user) return null;
-
-        const media = legacy.extended_entities?.media || [];
-
-        return {
-          id: legacy.id_str,
-          text: legacy.full_text,
-          created_at: legacy.created_at,
-          user: {
-            id: user.id_str,
-            name: user.name,
-            screen_name: user.screen_name,
-            profile_image_url: user.profile_image_url_https,
-          },
-          retweet_count: legacy.retweet_count,
-          favorite_count: legacy.favorite_count,
-          reply_count: legacy.reply_count,
-          media: media.map((m) => ({
-            type: m.type,
-            url: m.media_url_https,
-            video_url: m.video_info?.variants?.find(
-              (v) => v.content_type === "video/mp4",
-            )?.url,
-          })),
-          is_retweet: !!legacy.retweeted_status_result,
-          is_quote: !!legacy.is_quote_status,
-        };
-      } catch (err) {
-        console.error("Error extracting tweet info:", err);
-        return null;
-      }
-    }
-
     function updateArchiveUI(tweet) {
       if (!tweet) return;
 
       document.querySelector(".tweet-count").textContent = archivedTweets.size;
 
+      const tweetMediaCount = (r) =>
+        (r.media?.length ?? 0) +
+        (r.quote && !r.quote.unavailable ? (r.quote.media?.length ?? 0) : 0);
       let mediaCount = 0;
       for (const t of archivedTweets.values()) {
-        if (t && t.media) {
-          mediaCount += t.media.length;
-        }
+        if (!t) continue;
+        mediaCount += tweetMediaCount(t);
+        if (t.retweet) mediaCount += tweetMediaCount(t.retweet);
       }
       document.querySelector(".media-count").textContent = mediaCount;
 
@@ -873,22 +1127,42 @@
       const tweetEl = document.createElement("div");
       tweetEl.classList.add("archived-tweet");
 
+      const src = tweet.retweet || tweet;
+      const fullText = src.full_text ?? "";
       const text =
-        tweet.text.length > 100
-          ? tweet.text.substring(0, 100) + "..."
-          : tweet.text;
-      const date = new Date(tweet.created_at).toLocaleDateString("en-US", {
+        fullText.length > 100 ? fullText.substring(0, 100) + "..." : fullText;
+      const date = new Date(src.created_at).toLocaleDateString("en-US", {
         month: "long",
         day: "numeric",
         year: "numeric",
       });
 
+      const hasMedia =
+        (src.media?.length ?? 0) > 0 ||
+        (src.quote && !src.quote.unavailable && (src.quote.media?.length ?? 0) > 0);
+
+      const esc = (s) =>
+        (s ?? "").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+      const author = src.author ?? {};
+      const avatarUrl = author.profile_image_url
+        ? fullSizePfp(author.profile_image_url)
+        : "";
+
       tweetEl.innerHTML = `
-      <div class="tweet-header">
-        <span class="tweet-date">${date}</span>
-        ${tweet.media.length > 0 ? '<span class="has-media">📷</span>' : ""}
+      <div class="tweet-author">
+        ${avatarUrl ? `<img class="avatar" src="${avatarUrl}" loading="lazy" />` : `<span class="avatar"></span>`}
+        <div class="meta">
+          <span class="name">${esc(author.name || author.screen_name || "unknown")}</span>
+          <span class="sub">@${esc(author.screen_name || "")} · ${date}</span>
+        </div>
+        <div class="badges">
+          ${tweet.retweet ? '<span class="has-media">🔁</span>' : ""}
+          ${src.community_note ? '<span class="has-media">📝</span>' : ""}
+          ${hasMedia ? '<span class="has-media">📷</span>' : ""}
+          ${src.quote ? '<span class="has-media">❝</span>' : ""}
+        </div>
       </div>
-      <p class="tweet-text">${text.replaceAll("<", "&lt;").replaceAll(">", "&gt;")}</p>
+      <p class="tweet-text">${esc(text)}</p>
     `;
 
       tweetList.insertBefore(tweetEl, tweetList.firstChild);

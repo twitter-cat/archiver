@@ -32,5 +32,10 @@
     "@electron-forge/plugin-fuses": "^7.10.2",
     "@electron/fuses": "^1.8.0",
     "electron": "39.2.7"
-  }
+  },
+  "trustedDependencies": [
+    "electron",
+    "electron-winstaller",
+    "@electron-forge/maker-squirrel"
+  ]
 }
