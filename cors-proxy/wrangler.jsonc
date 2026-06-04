@@ -1,0 +1,8 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cors-estrogen-delivery",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-06-01",
+  "routes": [{ "pattern": "cors.estrogen.delivery", "custom_domain": true }],
+  "observability": { "enabled": true }
+}

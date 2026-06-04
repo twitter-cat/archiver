@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>__TITLE__</title>
+    <link rel="icon" type="image/png" href="https://abs.twimg.com/favicons/twitter.ico">
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="googlebot" content="noindex,follow">
+    <meta name="referrer" content="no-referrer">
+
+    <link rel="stylesheet" href="view.css">
+</head>
+<body>
+
+    <div class="page">
+
+        <div class="viewlist">
+            <div class="headerwrap"></div>
+            <div class="tabs" hidden>
+                <div class="tab active" data-tab="top">Top<span class="count"></span></div>
+                <div class="tab" data-tab="tweets">Tweets<span class="count"></span></div>
+                <div class="tab" data-tab="replies">Replies<span class="count"></span></div>
+                <div class="tab" data-tab="media">Media<span class="count"></span></div>
+            </div>
+            <div class="search" hidden>
+                <div class="searchbox">
+                    <svg viewBox="0 0 24 24"><path d="M10.3 3.8a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13m-8.5 6.5a8.5 8.5 0 1 1 15.1 5.2l4.8 4.8-1.4 1.4-4.8-4.8a8.5 8.5 0 0 1-13.7-6.6"/></svg>
+                    <input class="searchinput" placeholder="Search (Twitter syntax supported)" autocomplete="off">
+                </div>
+                <div class="searchinfo"><span class="resultcount"></span></div>
+            </div>
+            <div class="status">loading...</div>
+            <div class="feed" aria-live="polite"></div>
+            <div class="endmark" hidden>end of results.</div>
+            <div class="archivecredit">
+                archived by <a href="https://github.com/twitter-cat/twitterarchiver" target="_blank" rel="noopener">TwitterArchiver</a><br>
+                ui by <a href="https://coolsite.cv" target="_blank" rel="noopener">cvsilly</a>
+            </div>
+        </div>
+
+        <div class="viewdetail" hidden>
+            <div class="detailtopbar">
+                <button class="detailback" aria-label="back" type="button"></button>
+                <h2 class="detailtitle">Tweet</h2>
+            </div>
+            <div class="detailbody"></div>
+        </div>
+
+    </div>
+
+<script>
+    window.ARCHIVE = {
+        kind: "profile", param: "profile",
+        index: "profiles.json", indexkey: "profiles",
+        matchkey: "folder", titlesuffix: "__TITLESUFFIX__",
+        defaultcollection: "__FOLDER__",
+    };
+</script>
+<script src="https://unpkg.com/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous"></script>
+<script type="module" src="view.js"></script>
+
+</body>
+</html>
