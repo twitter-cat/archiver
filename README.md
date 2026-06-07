@@ -5,7 +5,7 @@
 captures tweets, replies, media (photos, videos, gifs), quote tweets, link embeds, and every referenced author's profile.
 
 ```bash
-bunx twitter-archiver elonmusk --token "..." --zip
+bunx archive-twitter elonmusk --token "..." --zip
 ```
 
 cycle several accounts (spreads rate limits):
