@@ -91,6 +91,5 @@ typings/
 # Electron-Forge
 out/
 
-# tcat-archiver
 tokens.txt
 *-archive/

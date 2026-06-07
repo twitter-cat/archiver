@@ -1,3 +1,5 @@
+import { c, sym } from "./ui.js";
+
 const isTTY = process.stdout.isTTY;
 
 function fmtDuration(secs) {
@@ -41,26 +43,26 @@ export class ProgressBar {
 		this.lastDraw = now;
 		const frac = this.total ? Math.min(1, this.done / this.total) : 0;
 		const filled = Math.round(frac * this.width);
-		const bar = "█".repeat(filled) + "░".repeat(this.width - filled);
+		const bar = c.bar("█".repeat(filled)) + c.barDim("░".repeat(this.width - filled));
 		const elapsed = (now - this.start) / 1000;
 		const rate = elapsed > 0 ? this.done / elapsed : 0;
 		const remaining =
 			rate > 0 ? Math.max(0, this.total - this.done) / rate : Number.POSITIVE_INFINITY;
 		const pct = String(Math.floor(frac * 100)).padStart(3, " ");
 		const parts = [
-			this.label ? `${this.label} ` : "",
-			`[${bar}] ${pct}%`,
-			`${this.done}/${this.total}`,
-			`${rate >= 1 ? rate.toFixed(0) : rate.toFixed(1)}/s`,
-			`ETA ${fmtDuration(remaining)}`,
+			this.label ? c.brand(this.label) : "",
+			`${c.dim("[")}${bar}${c.dim("]")} ${c.title(`${pct}%`)}`,
+			c.dim(`${this.done}/${this.total}`),
+			c.dim(`${rate >= 1 ? rate.toFixed(0) : rate.toFixed(1)}/s`),
+			c.dim(`ETA ${fmtDuration(remaining)}`),
 		];
-		if (this.note) parts.push(this.note);
-		write(parts.filter(Boolean).join(" · "));
+		if (this.note) parts.push(c.dim(this.note));
+		write(parts.filter(Boolean).join(` ${sym.dot} `));
 	}
 
 	finish(msg) {
 		this.render(true);
-		if (isTTY) process.stdout.write("\n");
+		if (isTTY) process.stdout.write(`  ${sym.ok}\n`);
 		if (msg) console.log(msg);
 	}
 }
@@ -88,13 +90,13 @@ export class Spinner {
 		const elapsed = (performance.now() - this.start) / 1000;
 		const rate = elapsed > 0 ? this.count / elapsed : 0;
 		const bits = [
-			`${f} ${this.label}`,
-			`${this.count} found`,
-			`${rate >= 1 ? rate.toFixed(0) : rate.toFixed(1)}/s`,
-			fmtDuration(elapsed),
+			`${c.brand(f)} ${c.brand(this.label)}`,
+			c.dim(`${this.count} found`),
+			c.dim(`${rate >= 1 ? rate.toFixed(0) : rate.toFixed(1)}/s`),
+			c.dim(fmtDuration(elapsed)),
 		];
-		if (this.extra) bits.push(this.extra);
-		write(bits.join(" · "));
+		if (this.extra) bits.push(c.dim(this.extra));
+		write(bits.join(` ${sym.dot} `));
 	}
 
 	stop(msg) {

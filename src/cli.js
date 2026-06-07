@@ -4,35 +4,36 @@ import { parseArgs } from "node:util";
 import { AccountPool, loadTokens } from "./accounts.js";
 import { writeExport } from "./export.js";
 import { extractProfile } from "./extract.js";
+import { c, sym } from "./ui.js";
 
-const HELP = `tcat-archive — archive a twitter/x profile into a self-contained html viewer
-
-usage:
-  tcat-archive <handle...> [options]
-
-options:
-  --token <auth_token>      an auth_token cookie value. repeatable for multiple
-                            accounts (they're cycled to spread rate limits).
-  --tokens-file <path>      file with one auth_token per line (or comma/space sep).
-  --out <dir>               output directory. default: <handle>-archive
-  --zip                     also produce a <out>.zip alongside the folder.
-  --client <name>           emusks client to emulate (e.g. tweetdeck). default: web.
-  --endpoint <name>         graphql endpoint: web | main | tweetdeck | ...
-  --concurrency <n>         parallel media downloads. default: 12.
-  -h, --help                show this help.
-
-tokens can also come from the ARCHIVER_TOKENS env var (comma/space separated).
-
-example:
-  tcat-archive tommyinnit --token AAA --token BBB --zip
-  ARCHIVER_TOKENS="AAA,BBB" tcat-archive jack dril --out ./archives
-
-view it by serving the output folder over http (browsers block file://):
-  cd <out> && bunx serve`;
+function help() {
+	const opt = (flag, desc) => `  ${c.brand(flag.padEnd(24))} ${c.dim(desc)}`;
+	return [
+		`${c.title("usage")}  ${c.dim("bunx archive-twitter")} ${c.brand("<handle...>")} ${c.dim("[options]")}`,
+		"",
+		c.title("options"),
+		opt("--token <auth_token>", "auth_token cookie value. repeatable to cycle"),
+		opt("", "accounts and spread rate limits."),
+		opt("--tokens-file <path>", "file with one auth_token per line (or sep)."),
+		opt("--out <dir>", "output directory. default: <handle>-archive"),
+		opt("--zip", "also produce a <out>.zip alongside the folder."),
+		opt("--client <name>", "emusks client to emulate. default: web."),
+		opt("--endpoint <name>", "graphql endpoint: web | main | tweetdeck | ..."),
+		opt("--concurrency <n>", "parallel media downloads. default: 12."),
+		opt("-h, --help", "show this help."),
+		"",
+		`${sym.dot} tokens can also come from the ${c.brand("ARCHIVER_TOKENS")} env var.`,
+		"",
+		c.title("examples"),
+		`  ${c.dim("bunx archive-twitter")} ${c.brand("tommyinnit")} ${c.dim("--token AAA --token BBB --zip")}`,
+		`  ${c.dim('ARCHIVER_TOKENS="AAA,BBB" bunx archive-twitter')} ${c.brand("jack")} ${c.dim("--out ./archives")}`,
+		"",
+	].join("\n");
+}
 
 function fail(msg) {
-	console.error(`error: ${msg}\n`);
-	console.error("run with --help for usage.");
+	console.error(`\n${sym.err} ${c.err(msg)}\n`);
+	console.error(c.dim("run with --help for usage."));
 	process.exit(1);
 }
 
@@ -56,9 +57,10 @@ async function main() {
 		fail(err.message);
 	}
 
-	const { values, positionals } = parsed;
+  const { values, positionals } = parsed;
+	
 	if (values.help || positionals.length === 0) {
-		console.log(HELP);
+		console.log(help());
 		process.exit(values.help ? 0 : 1);
 	}
 
@@ -74,13 +76,20 @@ async function main() {
 	}
 
 	const pool = new AccountPool({ client: values.client, endpoint: values.endpoint });
-	console.log(`logging in ${tokens.length} account${tokens.length === 1 ? "" : "s"}…`);
+	console.log(c.dim(`logging in ${tokens.length} account${tokens.length === 1 ? "" : "s"}...`));
 	try {
-		await pool.login(tokens, { onStatus: (s) => console.log(`  ${s}`) });
+		await pool.login(tokens, {
+			onStatus: (s) => {
+				const bad = /fail|error|denied/i.test(s);
+				console.log(`  ${bad ? sym.err : sym.ok} ${c.dim(s)}`);
+			},
+		});
 	} catch (err) {
 		fail(err.message);
 	}
-	console.log(`${pool.healthy} account${pool.healthy === 1 ? "" : "s"} ready.\n`);
+	console.log(
+		`${sym.ok} ${c.brand(pool.healthy)} ${c.dim(`account${pool.healthy === 1 ? "" : "s"} ready`)}\n`,
+	);
 
 	for (const handle of handles) {
 		const outDir = resolve(
@@ -89,23 +98,26 @@ async function main() {
 				: `${values.out ? `${values.out}/` : ""}${handle.toLowerCase()}-archive`,
 		);
 		try {
-			const result = await extractProfile(pool, handle, { onLog: (m) => console.log(m) });
+			const result = await extractProfile(pool, handle, {
+				onLog: (m) => console.log(`${sym.info} ${c.dim(m)}`),
+			});
 			const dl = await writeExport(result, outDir, { zip: values.zip, concurrency });
-			const bits = [`${dl.ok} media saved`];
-			if (dl.missing) bits.push(`${dl.missing} gone`);
-			if (dl.fail) bits.push(`${dl.fail} failed`);
-			console.log(`done: ${outDir}  (${bits.join(", ")})`);
-			if (dl.zip) console.log(`zip:  ${dl.zip}`);
+			const bits = [c.ok(`${dl.ok} media saved`)];
+			if (dl.missing) bits.push(c.warn(`${dl.missing} gone`));
+			if (dl.fail) bits.push(c.err(`${dl.fail} failed`));
+			console.log(`\n${sym.ok} ${c.title("archived")} ${c.brand(outDir)}`);
+			console.log(`  ${bits.join(` ${sym.dot} `)}`);
+			if (dl.zip) console.log(`  ${c.dim("zip")} ${sym.arrow} ${c.brand(dl.zip)}`);
 
 			process.exit(0);
 		} catch (err) {
-			console.error(`failed to archive @${handle}: ${err.message}\n`);
+			console.error(`\n${sym.err} ${c.err(`failed to archive @${handle}: ${err.message}`)}\n`);
 			process.exit(1);
 		}
 	}
 }
 
 main().catch((err) => {
-	console.error(err);
+	console.error(`\n${sym.err} ${c.err(err?.stack || err)}`);
 	process.exit(1);
 });

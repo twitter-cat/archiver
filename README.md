@@ -1,25 +1,11 @@
-# tcat-archiver
+![image](./image.png)
 
-simple cli that archives any twitter profile into a self-contained html viewer (by [cv](https://coolsite.cv)) using [emusks](https://emusks.tiago.zip).
+<h3 align="center">a simple cli to archive twitter profiles</h3>
 
 captures tweets, replies, media (photos, videos, gifs), quote tweets, link embeds, and every referenced author's profile.
 
-## install
-
 ```bash
-bun install
-```
-
-## usage
-
-```bash
-bun run src/cli.js <handle...> [options]
-```
-
-archive a single profile:
-
-```bash
-bun run src/cli.js tommyinnit --token ... --zip
+bunx twitter-archiver elonmusk --token "..." --zip
 ```
 
 cycle several accounts (spreads rate limits):
@@ -52,16 +38,7 @@ any account that hits a rate limit is cooled down while the others keep working.
 
 ## viewing your archive
 
-the output is a ready-to-serve folder:
-
-```
-index.html  view.js  view.css  search.js  profiles.json
-assets/fonts/…
-<handle>/tweets.json  <handle>/users.json  <handle>/cards.json
-<handle>/media/…  <handle>/pfps/…
-```
-
-browsers block `fetch` over `file://`, so serve it over http:
+you should serve your archive folder with a static server:
 
 ```bash
 cd <handle>-archive && bunx serve
@@ -75,6 +52,4 @@ to share it, upload the folder to any static host (cloudflare pages, etc.). pass
 
 please ensure you have permission before archiving tweets from any user.
 
-***
-
-built by [twitter.cat](https://twitter.cat) · not affiliated with X Corp.
+not affiliated with X Corp. viewer by [cv](https://coolsite.cv)
